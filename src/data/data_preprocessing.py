@@ -245,3 +245,41 @@ def normalize_rows_torch(tfidf_matrix):
     norms = torch.norm(tfidf_tensor, p=2, dim=1, keepdim=True)
     normalized_tensor = tfidf_tensor / norms
     return normalized_tensor
+
+def preprocess_for_pearson_similarity(matrix):
+    # Subtract the mean of each row to make the mean 0
+    mean_shifted = matrix - matrix.mean(dim=1, keepdim=True)
+
+    # Normalize each row to have a norm of 1
+    norm = mean_shifted.norm(p=2, dim=1, keepdim=True)
+    preprocessed_matrix = mean_shifted / norm
+
+    return preprocessed_matrix
+
+def retrieve_rows(tensor, portion_or_number, seed=None):
+    """
+    Randomly retrieves a specified number or portion of rows from a tensor.
+
+    Parameters:
+    tensor (torch.Tensor): The input 2D tensor.
+    portion_or_number (float or int): If greater than 1, it specifies the number of rows to retrieve.
+                                      If between 0 and 1, it specifies the portion (ratio) of rows to retrieve.
+    seed (int, optional): A random seed for reproducibility. Defaults to None.
+
+    Returns:
+    torch.Tensor: A tensor containing the randomly selected rows.
+    """
+    if seed is not None:
+        torch.manual_seed(seed)
+
+    num_rows = tensor.size(0)
+
+    if isinstance(portion_or_number, int) and portion_or_number > 1:
+        num_retrieve = min(portion_or_number, num_rows)
+    elif isinstance(portion_or_number, float) and 0 < portion_or_number < 1:
+        num_retrieve = int(num_rows * portion_or_number)
+    else:
+        raise ValueError("portion_or_number must be either an integer greater than 1 or a float between 0 and 1.")
+
+    indices = torch.randperm(num_rows)[:num_retrieve]
+    return tensor[indices]
