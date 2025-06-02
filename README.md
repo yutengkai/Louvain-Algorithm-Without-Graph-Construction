@@ -126,14 +126,3 @@ For major changes, start by discussing your idea with the maintainers.
 ---
 
 *(c) 2025 Tengkai Yu et al. This code is released under an open-source licence; see `LICENSE` for details.*
-
-```
-
----
-
-### What next?
-
-* Let me know **which parts to change, expand, or tone down**.  
-* Once the high-level content looks good, I can polish wording, add badges, or embed small runtime plots/screenshots.
-
-Looking forward to your feedback!
