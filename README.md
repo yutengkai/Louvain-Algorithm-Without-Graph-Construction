@@ -46,29 +46,100 @@ pip install -r requirements.txt        # PyTorch ≥2.1, NumPy, NetworkX, etc.
 
 ---
 
-## Quick start (Python)
+## Quick start — run graph-less Louvain in a few lines
+
+```bash
+git clone https://github.com/yutengkai/VLouvain.git
+cd VLouvain
+pip install -r requirements.txt
+````
 
 ```python
-from src.data.data_downloading import download_dataset
-from src.data.data_preprocessing import build_graph
-from src.main_algorithm import run_main_algorithm   # returns community labels
+import time, torch
+import numpy as np
 
-# 1 Download Flickr embeddings (~89 k nodes, 500-d)
-raw = download_dataset("Flickr", data_dir="./data")
+# ------------------------------------------------------------------
+# 1.  Create or load node-embedding matrix  V  (shape [n, d])
+# ------------------------------------------------------------------
+V = torch.randn(50_000, 512, device="cuda")          # demo data
 
-# 2 (Optional) preprocess – here we already have normalised vectors
-graph = build_graph(raw)            # wraps vectors → graph object with .vectors
+# ------------------------------------------------------------------
+# 2.  Normalise exactly as in the paper
+#     • L2-normalise each vector
+#     • append a “1” column
+#     • divide by √2
+# ------------------------------------------------------------------
+norms = torch.linalg.norm(V, dim=1, keepdim=True)     # or np.linalg.norm
+V_norm = V / norms
+V_norm = torch.cat((V_norm, torch.ones(V_norm.size(0), 1,
+                                       device=V_norm.device)), dim=1)
+V_norm /= 2 ** 0.5
 
-# 3 Run VLouvain
-labels = run_main_algorithm(
-    graph,
-    resolution=1.0,
-    device="cuda"        # set "cpu" if no GPU
+# ------------------------------------------------------------------
+# 3.  VLouvain  ➜  partition_history
+# ------------------------------------------------------------------
+from src.main_algorithm import (
+    louvain_partition_gpu,
+    get_final_communities,
+    modularity_all_partitions,
 )
-print(f"Found {len(set(labels))} communities!")
+
+partitions = louvain_partition_gpu(
+    V_norm,               # tensor [n, d+1]
+    gamma=1.0,            # resolution parameter
+    threshold=1e-7,
+    max_level=-1,
+    seed=42,
+)
+
+# ------------------------------------------------------------------
+# 4.  Final communities and modularity
+# ------------------------------------------------------------------
+final_partition = get_final_communities(partitions)          # tensor [n]
+Q               = modularity_all_partitions(V_norm, final_partition)
+
+print(f"Communities discovered : {final_partition.max().item()+1}")
+print(f"Modularity (Q)         : {Q:.4f}")
 ```
 
+*No adjacency matrix, no k-NN graph—VLouvain works directly on the
+normalised vector table.*
+
 ---
+
+## Dataset loading recipes (PyTorch Geometric)
+
+Each benchmark used in the paper is a single call to **Torch Geometric**.
+PyG downloads once to the `root=` directory and re-uses the local cache thereafter.
+
+```python
+# Flickr  (89 250 nodes × 500-d)
+from torch_geometric.datasets import Flickr
+flickr = Flickr(root="data/Flickr")
+X = flickr.data.x            # torch.Tensor [n, d]
+
+# Amazon Products  (1.57 M nodes × 200-d)
+from torch_geometric.datasets import AmazonProducts
+amazon = AmazonProducts(root="data/AmazonProducts")
+X = amazon.data.x
+
+# Yelp  (716 847 nodes × 300-d)
+from torch_geometric.datasets import Yelp
+yelp = Yelp(root="data/Yelp")
+X = yelp.data.x
+
+# Taobao  (heterogeneous graph)
+from torch_geometric.datasets import Taobao
+taobao = Taobao(root="data/Taobao")
+
+# Taobao is heterogeneous by nature.
+# Follow the transformation cells in
+# notebooks/Paper_Notebook_Homogeneous.ipynb
+# to convert it into the homogeneous format expected by VLouvain.
+```
+
+*Change `root="data/<Name>"` if you want PyG’s cache elsewhere—the loader will
+pick up the cached files automatically.*
 
 ## Notebook gallery
 
