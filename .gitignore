@@ -1,4 +1,27 @@
-"__pycache__/" 
-"*.pyc" 
-"data/raw/*" 
-"data/processed/*" 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Data
+data/raw/*
+data/processed/*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Jupyter
+.ipynb_checkpoints/
+
+# pytest
+.pytest_cache/
